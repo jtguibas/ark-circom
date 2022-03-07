@@ -4,6 +4,7 @@ use num_bigint::BigInt;
 use num_traits::Zero;
 use std::cell::Cell;
 use wasmer::{imports, Function, Instance, Memory, MemoryType, Module, RuntimeError, Store};
+use wasmer_engine_dylib::Dylib;
 
 #[cfg(feature = "circom-2")]
 use num::ToPrimitive;
@@ -54,8 +55,23 @@ fn to_array32(s: &BigInt, size: usize) -> Vec<u32> {
 
 impl WitnessCalculator {
     pub fn new(path: impl AsRef<std::path::Path>) -> Result<Self> {
-        let store = Store::default();
-        let module = Module::from_file(&store, path)?;
+        let store = match path.as_ref().extension() {
+            None => panic!("engine has no file extension"),
+            Some(os_str) => match os_str.to_str() {
+                Some("wasm") => Store::default(),
+                Some("dylib") => Store::new(&Dylib::headless().engine()),
+                _ => panic!("unsupported file extension"),
+            },
+        };
+
+        let module = match path.as_ref().extension() {
+            None => panic!("engine has no file extension"),
+            Some(os_str) => match os_str.to_str() {
+                Some("wasm") => Module::from_file(&store, path)?,
+                Some("dylib") => unsafe { Module::deserialize_from_file(&store, path) }?,
+                _ => panic!("engine has unsupported file extension"),
+            },
+        };
 
         // Set up the memory
         let memory = Memory::new(&store, MemoryType::new(2000, None, false)).unwrap();
