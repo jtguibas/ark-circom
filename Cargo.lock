@@ -104,7 +104,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "wasmer",
- "wasmer-engine-dylib",
+ "wasmer-engine-dylib 2.2.0 (git+https://github.com/wasmerio/wasmer)",
 ]
 
 [[package]]
@@ -3585,7 +3585,7 @@ checksum = "d7cff876b8f18eed75a66cf49b65e7f967cb354a7aa16003fb55dbfd25b44b4f"
 [[package]]
 name = "wasmer"
 version = "2.2.0"
-source = "git+https://github.com/wasmerio/wasmer#7fbaf6fc0563694d56d51106589a5b31f6c83582"
+source = "git+https://github.com/philsippl/wasmer?rev=4d9fa58#4d9fa588b4c11e449b22d7e2ad7a19259014b9c8"
 dependencies = [
  "cfg-if",
  "indexmap",
@@ -3595,16 +3595,34 @@ dependencies = [
  "target-lexicon",
  "thiserror",
  "wasm-bindgen",
- "wasmer-compiler",
+ "wasmer-compiler 2.2.0 (git+https://github.com/philsippl/wasmer?rev=4d9fa58)",
  "wasmer-compiler-cranelift",
  "wasmer-derive",
- "wasmer-engine",
- "wasmer-engine-dylib",
+ "wasmer-engine 2.2.0 (git+https://github.com/philsippl/wasmer?rev=4d9fa58)",
+ "wasmer-engine-dylib 2.2.0 (git+https://github.com/philsippl/wasmer?rev=4d9fa58)",
  "wasmer-engine-universal",
- "wasmer-types",
- "wasmer-vm",
+ "wasmer-types 2.2.0 (git+https://github.com/philsippl/wasmer?rev=4d9fa58)",
+ "wasmer-vm 2.2.0 (git+https://github.com/philsippl/wasmer?rev=4d9fa58)",
  "wat",
  "winapi",
+]
+
+[[package]]
+name = "wasmer-compiler"
+version = "2.2.0"
+source = "git+https://github.com/philsippl/wasmer?rev=4d9fa58#4d9fa588b4c11e449b22d7e2ad7a19259014b9c8"
+dependencies = [
+ "enumset",
+ "loupe",
+ "rkyv",
+ "serde",
+ "serde_bytes",
+ "smallvec",
+ "target-lexicon",
+ "thiserror",
+ "wasmer-types 2.2.0 (git+https://github.com/philsippl/wasmer?rev=4d9fa58)",
+ "wasmer-vm 2.2.0 (git+https://github.com/philsippl/wasmer?rev=4d9fa58)",
+ "wasmparser",
 ]
 
 [[package]]
@@ -3620,15 +3638,15 @@ dependencies = [
  "smallvec",
  "target-lexicon",
  "thiserror",
- "wasmer-types",
- "wasmer-vm",
+ "wasmer-types 2.2.0 (git+https://github.com/wasmerio/wasmer)",
+ "wasmer-vm 2.2.0 (git+https://github.com/wasmerio/wasmer)",
  "wasmparser",
 ]
 
 [[package]]
 name = "wasmer-compiler-cranelift"
 version = "2.2.0"
-source = "git+https://github.com/wasmerio/wasmer#7fbaf6fc0563694d56d51106589a5b31f6c83582"
+source = "git+https://github.com/philsippl/wasmer?rev=4d9fa58#4d9fa588b4c11e449b22d7e2ad7a19259014b9c8"
 dependencies = [
  "cranelift-codegen",
  "cranelift-entity",
@@ -3640,20 +3658,41 @@ dependencies = [
  "smallvec",
  "target-lexicon",
  "tracing",
- "wasmer-compiler",
- "wasmer-types",
- "wasmer-vm",
+ "wasmer-compiler 2.2.0 (git+https://github.com/philsippl/wasmer?rev=4d9fa58)",
+ "wasmer-types 2.2.0 (git+https://github.com/philsippl/wasmer?rev=4d9fa58)",
+ "wasmer-vm 2.2.0 (git+https://github.com/philsippl/wasmer?rev=4d9fa58)",
 ]
 
 [[package]]
 name = "wasmer-derive"
 version = "2.2.0"
-source = "git+https://github.com/wasmerio/wasmer#7fbaf6fc0563694d56d51106589a5b31f6c83582"
+source = "git+https://github.com/philsippl/wasmer?rev=4d9fa58#4d9fa588b4c11e449b22d7e2ad7a19259014b9c8"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "wasmer-engine"
+version = "2.2.0"
+source = "git+https://github.com/philsippl/wasmer?rev=4d9fa58#4d9fa588b4c11e449b22d7e2ad7a19259014b9c8"
+dependencies = [
+ "backtrace",
+ "enumset",
+ "lazy_static",
+ "loupe",
+ "memmap2",
+ "more-asserts",
+ "rustc-demangle",
+ "serde",
+ "serde_bytes",
+ "target-lexicon",
+ "thiserror",
+ "wasmer-compiler 2.2.0 (git+https://github.com/philsippl/wasmer?rev=4d9fa58)",
+ "wasmer-types 2.2.0 (git+https://github.com/philsippl/wasmer?rev=4d9fa58)",
+ "wasmer-vm 2.2.0 (git+https://github.com/philsippl/wasmer?rev=4d9fa58)",
 ]
 
 [[package]]
@@ -3672,9 +3711,33 @@ dependencies = [
  "serde_bytes",
  "target-lexicon",
  "thiserror",
- "wasmer-compiler",
- "wasmer-types",
- "wasmer-vm",
+ "wasmer-compiler 2.2.0 (git+https://github.com/wasmerio/wasmer)",
+ "wasmer-types 2.2.0 (git+https://github.com/wasmerio/wasmer)",
+ "wasmer-vm 2.2.0 (git+https://github.com/wasmerio/wasmer)",
+]
+
+[[package]]
+name = "wasmer-engine-dylib"
+version = "2.2.0"
+source = "git+https://github.com/philsippl/wasmer?rev=4d9fa58#4d9fa588b4c11e449b22d7e2ad7a19259014b9c8"
+dependencies = [
+ "cfg-if",
+ "enum-iterator",
+ "enumset",
+ "leb128",
+ "libloading",
+ "loupe",
+ "object 0.28.3",
+ "rkyv",
+ "serde",
+ "tempfile",
+ "tracing",
+ "wasmer-compiler 2.2.0 (git+https://github.com/philsippl/wasmer?rev=4d9fa58)",
+ "wasmer-engine 2.2.0 (git+https://github.com/philsippl/wasmer?rev=4d9fa58)",
+ "wasmer-object 2.2.0 (git+https://github.com/philsippl/wasmer?rev=4d9fa58)",
+ "wasmer-types 2.2.0 (git+https://github.com/philsippl/wasmer?rev=4d9fa58)",
+ "wasmer-vm 2.2.0 (git+https://github.com/philsippl/wasmer?rev=4d9fa58)",
+ "which",
 ]
 
 [[package]]
@@ -3693,18 +3756,18 @@ dependencies = [
  "serde",
  "tempfile",
  "tracing",
- "wasmer-compiler",
- "wasmer-engine",
- "wasmer-object",
- "wasmer-types",
- "wasmer-vm",
+ "wasmer-compiler 2.2.0 (git+https://github.com/wasmerio/wasmer)",
+ "wasmer-engine 2.2.0 (git+https://github.com/wasmerio/wasmer)",
+ "wasmer-object 2.2.0 (git+https://github.com/wasmerio/wasmer)",
+ "wasmer-types 2.2.0 (git+https://github.com/wasmerio/wasmer)",
+ "wasmer-vm 2.2.0 (git+https://github.com/wasmerio/wasmer)",
  "which",
 ]
 
 [[package]]
 name = "wasmer-engine-universal"
 version = "2.2.0"
-source = "git+https://github.com/wasmerio/wasmer#7fbaf6fc0563694d56d51106589a5b31f6c83582"
+source = "git+https://github.com/philsippl/wasmer?rev=4d9fa58#4d9fa588b4c11e449b22d7e2ad7a19259014b9c8"
 dependencies = [
  "cfg-if",
  "enum-iterator",
@@ -3713,11 +3776,22 @@ dependencies = [
  "loupe",
  "region",
  "rkyv",
- "wasmer-compiler",
- "wasmer-engine",
- "wasmer-types",
- "wasmer-vm",
+ "wasmer-compiler 2.2.0 (git+https://github.com/philsippl/wasmer?rev=4d9fa58)",
+ "wasmer-engine 2.2.0 (git+https://github.com/philsippl/wasmer?rev=4d9fa58)",
+ "wasmer-types 2.2.0 (git+https://github.com/philsippl/wasmer?rev=4d9fa58)",
+ "wasmer-vm 2.2.0 (git+https://github.com/philsippl/wasmer?rev=4d9fa58)",
  "winapi",
+]
+
+[[package]]
+name = "wasmer-object"
+version = "2.2.0"
+source = "git+https://github.com/philsippl/wasmer?rev=4d9fa58#4d9fa588b4c11e449b22d7e2ad7a19259014b9c8"
+dependencies = [
+ "object 0.28.3",
+ "thiserror",
+ "wasmer-compiler 2.2.0 (git+https://github.com/philsippl/wasmer?rev=4d9fa58)",
+ "wasmer-types 2.2.0 (git+https://github.com/philsippl/wasmer?rev=4d9fa58)",
 ]
 
 [[package]]
@@ -3727,8 +3801,20 @@ source = "git+https://github.com/wasmerio/wasmer#7fbaf6fc0563694d56d51106589a5b3
 dependencies = [
  "object 0.28.3",
  "thiserror",
- "wasmer-compiler",
- "wasmer-types",
+ "wasmer-compiler 2.2.0 (git+https://github.com/wasmerio/wasmer)",
+ "wasmer-types 2.2.0 (git+https://github.com/wasmerio/wasmer)",
+]
+
+[[package]]
+name = "wasmer-types"
+version = "2.2.0"
+source = "git+https://github.com/philsippl/wasmer?rev=4d9fa58#4d9fa588b4c11e449b22d7e2ad7a19259014b9c8"
+dependencies = [
+ "indexmap",
+ "loupe",
+ "rkyv",
+ "serde",
+ "thiserror",
 ]
 
 [[package]]
@@ -3741,6 +3827,28 @@ dependencies = [
  "rkyv",
  "serde",
  "thiserror",
+]
+
+[[package]]
+name = "wasmer-vm"
+version = "2.2.0"
+source = "git+https://github.com/philsippl/wasmer?rev=4d9fa58#4d9fa588b4c11e449b22d7e2ad7a19259014b9c8"
+dependencies = [
+ "backtrace",
+ "cc",
+ "cfg-if",
+ "enum-iterator",
+ "indexmap",
+ "libc",
+ "loupe",
+ "memoffset",
+ "more-asserts",
+ "region",
+ "rkyv",
+ "serde",
+ "thiserror",
+ "wasmer-types 2.2.0 (git+https://github.com/philsippl/wasmer?rev=4d9fa58)",
+ "winapi",
 ]
 
 [[package]]
@@ -3761,7 +3869,7 @@ dependencies = [
  "rkyv",
  "serde",
  "thiserror",
- "wasmer-types",
+ "wasmer-types 2.2.0 (git+https://github.com/wasmerio/wasmer)",
  "winapi",
 ]
 
