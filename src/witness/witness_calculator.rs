@@ -59,8 +59,9 @@ impl WitnessCalculator {
             None => panic!("engine has no file extension"),
             Some(os_str) => match os_str.to_str() {
                 Some("wasm") => Store::default(),
-                Some("dylib") => Store::new(&Dylib::headless().engine()),
-                _ => panic!("unsupported file extension"),
+                // Some("dylib") => Store::new(&Dylib::headless().engine()),
+                // _ => panic!("unsupported file extension"),
+                _ => Store::new(&Dylib::headless().engine()),
             },
         };
 
@@ -68,8 +69,9 @@ impl WitnessCalculator {
             None => panic!("engine has no file extension"),
             Some(os_str) => match os_str.to_str() {
                 Some("wasm") => Module::from_file(&store, path)?,
-                Some("dylib") => unsafe { Module::deserialize_from_file(&store, path) }?,
-                _ => panic!("engine has unsupported file extension"),
+                // Some("dylib") => unsafe { Module::deserialize_from_file(&store, path) }?,
+                // _ => panic!("engine has unsupported file extension"),
+                _ => unsafe { Module::deserialize_from_file(&store, path) }?,
             },
         };
 
