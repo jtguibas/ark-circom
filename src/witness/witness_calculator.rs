@@ -56,7 +56,8 @@ fn to_array32(s: &BigInt, size: usize) -> Vec<u32> {
 impl WitnessCalculator {
     pub fn new(path: impl AsRef<std::path::Path>) -> Result<Self> {
         let store = match path.as_ref().extension() {
-            None => panic!("engine has no file extension"),
+            // None => panic!("engine has no file extension"),
+            None => Store::new(&Dylib::headless().engine()),
             Some(os_str) => match os_str.to_str() {
                 Some("wasm") => Store::default(),
                 // Some("dylib") => Store::new(&Dylib::headless().engine()),
@@ -66,7 +67,8 @@ impl WitnessCalculator {
         };
 
         let module = match path.as_ref().extension() {
-            None => panic!("engine has no file extension"),
+            // None => panic!("engine has no file extension"),
+            None => unsafe { Module::deserialize_from_file(&store, path) }?,
             Some(os_str) => match os_str.to_str() {
                 Some("wasm") => Module::from_file(&store, path)?,
                 // Some("dylib") => unsafe { Module::deserialize_from_file(&store, path) }?,
