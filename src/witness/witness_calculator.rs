@@ -2,7 +2,7 @@ use super::{fnv, CircomBase, SafeMemory, Wasm};
 use color_eyre::Result;
 use num_bigint::BigInt;
 use num_traits::Zero;
-use std::cell::Cell;
+use std::{cell::Cell, ffi::OsStr};
 use wasmer::{imports, Function, Instance, Memory, MemoryType, Module, RuntimeError, Store};
 use wasmer_engine_dylib::Dylib;
 
@@ -55,26 +55,18 @@ fn to_array32(s: &BigInt, size: usize) -> Vec<u32> {
 
 impl WitnessCalculator {
     pub fn new(path: impl AsRef<std::path::Path>) -> Result<Self> {
-        let store = match path.as_ref().extension() {
-            // None => panic!("engine has no file extension"),
-            None => Store::new(&Dylib::headless().engine()),
-            Some(os_str) => match os_str.to_str() {
-                Some("wasm") => Store::default(),
-                // Some("dylib") => Store::new(&Dylib::headless().engine()),
-                // _ => panic!("unsupported file extension"),
-                _ => Store::new(&Dylib::headless().engine()),
+        let (store, module) = match path.as_ref().extension().and_then(OsStr::to_str) {
+            Some("dylib") => {
+                let store = Store::new(&Dylib::headless().engine());
+                let module = unsafe { Module::deserialize_from_file(&store, path) }?;
+                (store, module)
             },
-        };
-
-        let module = match path.as_ref().extension() {
-            // None => panic!("engine has no file extension"),
-            None => unsafe { Module::deserialize_from_file(&store, path) }?,
-            Some(os_str) => match os_str.to_str() {
-                Some("wasm") => Module::from_file(&store, path)?,
-                // Some("dylib") => unsafe { Module::deserialize_from_file(&store, path) }?,
-                // _ => panic!("engine has unsupported file extension"),
-                _ => unsafe { Module::deserialize_from_file(&store, path) }?,
-            },
+            _ => {
+                // treat as wasm module by default to not break compatibility
+                let store = Store::default();
+                let module = Module::from_file(&store, path)?;
+                (store, module)
+            }
         };
 
         // Set up the memory
