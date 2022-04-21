@@ -3,7 +3,11 @@ use color_eyre::Result;
 use num_bigint::BigInt;
 use num_traits::Zero;
 use std::cell::Cell;
-use wasmer::{imports, Function, Instance, Memory, MemoryType, Module, RuntimeError, Store};
+use std::fs::File;
+use wasmi::{
+    memory_units::Pages, FuncRef, ImportsBuilder, MemoryInstance, MemoryRef, Module,
+    ModuleInstance, NopExternals, RuntimeValue, ModuleImportResolver, FuncInstance
+};
 
 #[cfg(feature = "circom-2")]
 use num::ToPrimitive;
@@ -58,39 +62,68 @@ impl WitnessCalculator {
     }
 
     pub fn from_file(path: impl AsRef<std::path::Path>) -> Result<Self> {
-        let store = Store::default();
-        let module = Module::from_file(&store, path)?;
-        Self::from_module(module)
+        use std::io::prelude::*;
+        let mut file = File::open(path).unwrap();
+        let mut buf = Vec::new();
+        file.read_to_end(&mut buf).unwrap();
+        Self::from_module(Module::from_buffer(buf)?)
     }
 
     pub fn from_module(module: Module) -> Result<Self> {
-        let store = module.store();
 
-        // Set up the memory
-        let memory = Memory::new(store, MemoryType::new(2000, None, false)).unwrap();
-        let import_object = imports! {
-            "env" => {
-                "memory" => memory.clone(),
-            },
-            // Host function callbacks from the WASM
-            "runtime" => {
-                "error" => runtime::error(store),
-                "logSetSignal" => runtime::log_signal(store),
-                "logGetSignal" => runtime::log_signal(store),
-                "logFinishComponent" => runtime::log_component(store),
-                "logStartComponent" => runtime::log_component(store),
-                "log" => runtime::log_component(store),
-                "exceptionHandler" => runtime::exception_handler(store),
-                "showSharedRWMemory" => runtime::show_memory(store),
+        let memory = MemoryInstance::alloc(Pages(2000), None)?;
+
+        struct MemResolver(MemoryRef);
+        impl<'a> ModuleImportResolver for MemResolver {
+            fn resolve_memory(
+                &self, 
+                field_name: &str,
+                _memory_type: &wasmi::MemoryDescriptor,
+            ) -> Result<MemoryRef, wasmi::Error> {
+                Ok(self.0.clone())
             }
-        };
-        let instance = Wasm::new(Instance::new(&module, &import_object)?);
+        }
+
+        struct FuncResolver;
+        impl<'a> ModuleImportResolver for FuncResolver {
+            fn resolve_func(
+                &self, 
+                field_name: &str, 
+                _signature: &wasmi::Signature
+            ) -> Result<FuncRef, wasmi::Error> {
+                if _signature.params().len() == 0 {
+                    Ok(FuncInstance::alloc_host(wasmi::Signature::new(&[][..], None), 0))
+                } else if _signature.params().len() == 1 {
+                    Ok(FuncInstance::alloc_host(wasmi::Signature::new(&[wasmi::ValueType::I32; 1][..], None), 0))
+                } else if _signature.params().len() == 2 {
+                    Ok(FuncInstance::alloc_host(wasmi::Signature::new(&[wasmi::ValueType::I32; 2][..], None), 0))
+                } else {
+                    Ok(FuncInstance::alloc_host(wasmi::Signature::new(&[wasmi::ValueType::I32; 6][..], None), 0))
+                }
+            }
+        }
+
+        let mem_import_resolver = MemResolver(memory.clone());
+
+        let imports = ImportsBuilder::new().with_resolver("env", &mem_import_resolver)
+        .with_resolver("runtime", &FuncResolver);
+
+        let main = ModuleInstance::new(&module, &imports)
+            .expect("Failed to instantiate module")
+            .run_start(&mut NopExternals)
+            .expect("Failed to run start function in module");
+
+        let instance = Wasm::new(main);
 
         let version = instance.get_version().unwrap_or(1);
 
         // Circom 2 feature flag with version 2
         #[cfg(feature = "circom-2")]
-        fn new_circom2(instance: Wasm, memory: Memory, version: u32) -> Result<WitnessCalculator> {
+        fn new_circom2(
+            instance: Wasm,
+            memory: MemoryRef,
+            version: u32,
+        ) -> Result<WitnessCalculator> {
             let n32 = instance.get_field_num_len32()?;
             let mut safe_memory = SafeMemory::new(memory, n32 as usize, BigInt::zero());
             instance.get_raw_prime()?;
@@ -112,13 +145,16 @@ impl WitnessCalculator {
             })
         }
 
-        fn new_circom1(instance: Wasm, memory: Memory, version: u32) -> Result<WitnessCalculator> {
+        fn new_circom1(
+            instance: Wasm,
+            memory: MemoryRef,
+            version: u32,
+        ) -> Result<WitnessCalculator> {
             // Fallback to Circom 1 behavior
             let n32 = (instance.get_fr_len()? >> 2) - 2;
             let mut safe_memory = SafeMemory::new(memory, n32 as usize, BigInt::zero());
             let ptr = instance.get_ptr_raw_prime()?;
             let prime = safe_memory.read_big(ptr as usize, n32 as usize)?;
-
             let n64 = ((prime.bits() - 1) / 64 + 1) as u32;
             safe_memory.prime = prime;
 
@@ -190,8 +226,10 @@ impl WitnessCalculator {
                 .get_signal_offset32(p_sig_offset, 0, msb, lsb)?;
 
             let sig_offset = self.memory.read_u32(p_sig_offset as usize) as usize;
+            dbg!(p_sig_offset);
 
             for (i, value) in values.into_iter().enumerate() {
+                dbg!(&value);
                 self.memory.write_fr(p_fr as usize, &value)?;
                 self.instance
                     .set_signal(0, 0, (sig_offset + i) as u32, p_fr as u32)?;
@@ -287,62 +325,8 @@ impl WitnessCalculator {
 
     pub fn get_witness_buffer(&self) -> Result<Vec<u8>> {
         let ptr = self.instance.get_ptr_witness_buffer()? as usize;
-
-        let view = self.memory.memory.view::<u8>();
-
         let len = self.instance.get_n_vars()? * self.n64 * 8;
-        let arr = view[ptr..ptr + len as usize]
-            .iter()
-            .map(Cell::get)
-            .collect::<Vec<_>>();
-
-        Ok(arr)
-    }
-}
-
-// callback hooks for debugging
-mod runtime {
-    use super::*;
-
-    pub fn error(store: &Store) -> Function {
-        #[allow(unused)]
-        #[allow(clippy::many_single_char_names)]
-        fn func(a: i32, b: i32, c: i32, d: i32, e: i32, f: i32) {
-            // NOTE: We can also get more information why it is failing, see p2str etc here:
-            // https://github.com/iden3/circom_runtime/blob/master/js/witness_calculator.js#L52-L64
-            println!(
-                "runtime error, exiting early: {0} {1} {2} {3} {4} {5}",
-                a, b, c, d, e, f
-            );
-            RuntimeError::raise(Box::new(ExitCode(1)));
-        }
-        Function::new_native(store, func)
-    }
-
-    // Circom 2.0
-    pub fn exception_handler(store: &Store) -> Function {
-        #[allow(unused)]
-        fn func(a: i32) {}
-        Function::new_native(store, func)
-    }
-
-    // Circom 2.0
-    pub fn show_memory(store: &Store) -> Function {
-        #[allow(unused)]
-        fn func() {}
-        Function::new_native(store, func)
-    }
-
-    pub fn log_signal(store: &Store) -> Function {
-        #[allow(unused)]
-        fn func(a: i32, b: i32) {}
-        Function::new_native(store, func)
-    }
-
-    pub fn log_component(store: &Store) -> Function {
-        #[allow(unused)]
-        fn func(a: i32) {}
-        Function::new_native(store, func)
+        Ok(self.memory.memory.get(ptr as u32, len as usize)?)
     }
 }
 
