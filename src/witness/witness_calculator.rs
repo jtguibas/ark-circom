@@ -226,7 +226,6 @@ impl WitnessCalculator {
                 .get_signal_offset32(p_sig_offset, 0, msb, lsb)?;
 
             let sig_offset = self.memory.read_u32(p_sig_offset as usize) as usize;
-            dbg!(p_sig_offset);
 
             for (i, value) in values.into_iter().enumerate() {
                 dbg!(&value);

@@ -85,7 +85,7 @@ impl SafeMemory {
 
     /// Reads a u32 from the specified memory offset
     pub fn read_u32(&self, ptr: usize) -> u32 {
-        self.memory.get_value::<u32>(0).unwrap()
+        self.memory.get_value::<u32>(ptr as u32).unwrap()
     }
 
     /// Allocates `self.n32 * 4 + 8` bytes in the memory
