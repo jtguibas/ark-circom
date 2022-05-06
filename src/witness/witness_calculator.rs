@@ -2,7 +2,6 @@ use super::{fnv, CircomBase, SafeMemory, Wasm};
 use color_eyre::Result;
 use num_bigint::BigInt;
 use num_traits::Zero;
-use std::cell::Cell;
 use std::fs::File;
 use wasmi::{
     memory_units::Pages, FuncRef, ImportsBuilder, MemoryInstance, MemoryRef, Module,
@@ -214,9 +213,9 @@ impl WitnessCalculator {
     ) -> Result<Vec<BigInt>> {
         self.instance.init(sanity_check)?;
 
-        let old_mem_free_pos = self.memory.free_pos();
-        let p_sig_offset = self.memory.alloc_u32();
-        let p_fr = self.memory.alloc_fr();
+        let old_mem_free_pos = self.memory.free_pos()?;
+        let p_sig_offset = self.memory.alloc_u32()?;
+        let p_fr = self.memory.alloc_fr()?;
 
         // allocate the inputs
         for (name, values) in inputs.into_iter() {
@@ -225,7 +224,7 @@ impl WitnessCalculator {
             self.instance
                 .get_signal_offset32(p_sig_offset, 0, msb, lsb)?;
 
-            let sig_offset = self.memory.read_u32(p_sig_offset as usize) as usize;
+            let sig_offset = self.memory.read_u32(p_sig_offset as usize)? as usize;
 
             for (i, value) in values.into_iter().enumerate() {
                 dbg!(&value);
@@ -244,7 +243,7 @@ impl WitnessCalculator {
             w.push(el);
         }
 
-        self.memory.set_free_pos(old_mem_free_pos);
+        self.memory.set_free_pos(old_mem_free_pos)?;
 
         Ok(w)
     }

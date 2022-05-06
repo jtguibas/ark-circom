@@ -62,37 +62,37 @@ impl SafeMemory {
     // }
 
     /// Returns the next free position in the memory
-    pub fn free_pos(&self) -> u32 {
-        self.memory.get_value::<u32>(0).unwrap()
+    pub fn free_pos(&self) -> Result<u32> {
+        Ok(self.memory.get_value::<u32>(0)?)
     }
 
     /// Sets the next free position in the memory
-    pub fn set_free_pos(&mut self, ptr: u32) {
-        self.memory.set_value::<u32>(0, ptr);
+    pub fn set_free_pos(&mut self, ptr: u32) -> Result<()> {
+        Ok(self.memory.set_value::<u32>(0, ptr)?)
     }
 
     /// Allocates a U32 in memory
-    pub fn alloc_u32(&mut self) -> u32 {
-        let p = self.free_pos();
-        self.set_free_pos(p + 8);
-        p
+    pub fn alloc_u32(&mut self) -> Result<u32> {
+        let p = self.free_pos()?;
+        self.set_free_pos(p + 8)?;
+        Ok(p)
     }
 
     /// Writes a u32 to the specified memory offset
-    pub fn write_u32(&mut self, ptr: usize, num: u32) {
-        self.memory.set_value::<u32>(ptr as u32, num);
+    pub fn write_u32(&mut self, ptr: usize, num: u32) -> Result<()> {
+        Ok(self.memory.set_value::<u32>(ptr as u32, num)?)
     }
 
     /// Reads a u32 from the specified memory offset
-    pub fn read_u32(&self, ptr: usize) -> u32 {
-        self.memory.get_value::<u32>(ptr as u32).unwrap()
+    pub fn read_u32(&self, ptr: usize) -> Result<u32> {
+        Ok(self.memory.get_value::<u32>(ptr as u32)?)
     }
 
     /// Allocates `self.n32 * 4 + 8` bytes in the memory
-    pub fn alloc_fr(&mut self) -> u32 {
-        let p = self.free_pos();
-        self.set_free_pos(p + self.n32 as u32 * 4 + 8);
-        p
+    pub fn alloc_fr(&mut self) -> Result<u32> {
+        let p = self.free_pos()?;
+        self.set_free_pos(p + self.n32 as u32 * 4 + 8)?;
+        Ok(p)
     }
 
     /// Writes a Field Element to memory at the specified offset, truncating
@@ -120,12 +120,12 @@ impl SafeMemory {
             }
             num
         } else if self.memory.get((ptr + 3) as u32, 1)?[0] & 0x40 != 0 {
-            let mut num = self.read_u32(ptr).into();
+            let mut num = self.read_u32(ptr)?.into();
             // handle small negative
             num -= BigInt::from(0x100000000i64);
             num
         } else {
-            self.read_u32(ptr).into()
+            self.read_u32(ptr)?.into()
         };
 
         Ok(res)
@@ -133,8 +133,8 @@ impl SafeMemory {
 
     fn write_short_positive(&mut self, ptr: usize, fr: &BigInt) -> Result<()> {
         let num = fr.to_i32().expect("not a short positive");
-        self.memory.set_value::<u32>(ptr as u32, num as u32);
-        self.memory.set_value::<u32>((ptr + 4) as u32, 0);
+        self.memory.set_value::<u32>(ptr as u32, num as u32)?;
+        self.memory.set_value::<u32>((ptr + 4) as u32, 0)?;
         Ok(())
     }
 
@@ -148,14 +148,14 @@ impl SafeMemory {
             .to_u32()
             .expect("could not cast as u32 (should never happen)");
 
-        self.memory.set_value::<u32>(ptr as u32, num);
-        self.memory.set_value::<u32>((ptr + 4) as u32, 0);
+        self.memory.set_value::<u32>(ptr as u32, num)?;
+        self.memory.set_value::<u32>((ptr + 4) as u32, 0)?;
         Ok(())
     }
 
     fn write_long_normal(&mut self, ptr: usize, fr: &BigInt) -> Result<()> {
-        self.memory.set_value::<u32>(ptr as u32, 0);
-        self.memory.set_value::<u32>((ptr + 4) as u32, i32::MIN as u32); // 0x80000000
+        self.memory.set_value::<u32>(ptr as u32, 0)?;
+        self.memory.set_value::<u32>((ptr + 4) as u32, i32::MIN as u32)?; // 0x80000000
         self.write_big(ptr + 8, fr)?;
         Ok(())
     }
@@ -166,7 +166,7 @@ impl SafeMemory {
         let num = BigInteger256::try_from(num).unwrap();
 
         let bytes = num.to_bytes_le();
-        self.memory.set(ptr as u32, &bytes);
+        self.memory.set(ptr as u32, &bytes)?;
 
         Ok(())
     }
@@ -219,11 +219,11 @@ mod tests {
         let mut mem = new();
         let num = u32::MAX;
 
-        let inp = mem.read_u32(0);
+        let inp = mem.read_u32(0).unwrap();
         assert_eq!(inp, 0);
 
-        mem.write_u32(0, num);
-        let inp = mem.read_u32(0);
+        mem.write_u32(0, num).unwrap();
+        let inp = mem.read_u32(0).unwrap();
         assert_eq!(inp, num);
     }
 

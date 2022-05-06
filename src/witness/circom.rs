@@ -56,7 +56,7 @@ impl Circom2 for Wasm {
     }
 
     fn get_raw_prime(&self) -> Result<()> {
-        let _ = self.0.invoke_export("getRawPrime", &[], &mut NopExternals);
+        self.0.invoke_export("getRawPrime", &[], &mut NopExternals)?;
         Ok(())
     }
 
@@ -69,20 +69,20 @@ impl Circom2 for Wasm {
     }
 
     fn write_shared_rw_memory(&self, i: u32, v: u32) -> Result<()> {
-        let _ = self.0.invoke_export(
+        self.0.invoke_export(
             "writeSharedRWMemory",
             &[i.into(), v.into()],
             &mut NopExternals,
-        );
+        )?;
         Ok(())
     }
 
     fn set_input_signal(&self, hmsb: u32, hlsb: u32, pos: u32) -> Result<()> {
-        let _ = self.0.invoke_export(
+        self.0.invoke_export(
             "setInputSignal",
             &[hmsb.into(), hlsb.into(), pos.into()],
             &mut NopExternals,
-        );
+        )?;
         Ok(())
     }
 
@@ -91,7 +91,7 @@ impl Circom2 for Wasm {
             "getWitness",
             &[i.into()],
             &mut NopExternals,
-        );
+        )?;
         Ok(())
     }
 
@@ -102,11 +102,11 @@ impl Circom2 for Wasm {
 
 impl CircomBase for Wasm {
     fn init(&self, sanity_check: bool) -> Result<()> {
-        let _ = self.0.invoke_export(
+        self.0.invoke_export(
             "init",
             &[RuntimeValue::I32(sanity_check as i32)],
             &mut NopExternals,
-        );
+        )?;
         Ok(())
     }
 
@@ -133,7 +133,7 @@ impl CircomBase for Wasm {
         hash_msb: u32,
         hash_lsb: u32,
     ) -> Result<()> {
-        let _ = self.0.invoke_export(
+        self.0.invoke_export(
             "getSignalOffset32",
             &[
                 p_sig_offset.into(),
@@ -142,17 +142,17 @@ impl CircomBase for Wasm {
                 hash_lsb.into(),
             ],
             &mut NopExternals,
-        );
+        )?;
 
         Ok(())
     }
 
     fn set_signal(&self, c_idx: u32, component: u32, signal: u32, p_val: u32) -> Result<()> {
-        let _ = self.0.invoke_export(
+        self.0.invoke_export(
             "setSignal",
             &[c_idx.into(), component.into(), signal.into(), p_val.into()],
             &mut NopExternals,
-        );
+        )?;
         Ok(())
     }
 
