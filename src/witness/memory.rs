@@ -1,6 +1,6 @@
 //! Safe-ish interface for reading and writing specific types to the WASM runtime's memory
 use num_traits::ToPrimitive;
-use wasmi::{MemoryInstance, MemoryRef, memory_units::Pages};
+use wasmi::MemoryRef;
 
 // TODO: Decide whether we want Ark here or if it should use a generic BigInt package
 use ark_bn254::FrParameters;
@@ -113,13 +113,13 @@ impl SafeMemory {
 
     /// Reads a Field Element from the memory at the specified offset
     pub fn read_fr(&self, ptr: usize) -> Result<BigInt> {
-        let res = if self.memory.get((ptr + 4 + 3) as u32, 1)?[0] & 0x80 != 0 {
+        let res = if self.memory.get_value::<u8>((ptr + 4 + 3) as u32)? & 0x80 != 0 {
             let mut num = self.read_big(ptr + 8, self.n32)?;
-            if self.memory.get((ptr + 4 + 3) as u32, 1)?[0] & 0x40 != 0 {
+            if self.memory.get_value::<u8>((ptr + 4 + 3) as u32)? & 0x40 != 0 {
                 num = (num * &self.r_inv) % &self.prime
             }
             num
-        } else if self.memory.get((ptr + 3) as u32, 1)?[0] & 0x40 != 0 {
+        } else if self.memory.get_value::<u8>((ptr + 3) as u32)? & 0x40 != 0 {
             let mut num = self.read_u32(ptr)?.into();
             // handle small negative
             num -= BigInt::from(0x100000000i64);
@@ -173,7 +173,10 @@ impl SafeMemory {
 
     /// Reads `num_bytes * 32` from the specified memory offset in a Big Integer
     pub fn read_big(&self, ptr: usize, num_bytes: usize) -> Result<BigInt> {
-        let buf = self.memory.get(ptr as u32, num_bytes * 32)?;
+        let len = num_bytes * 32;
+        let mut buf = vec![0u8; len as usize];
+        self.memory.get_into(ptr as u32, &mut buf)?;
+
         // TODO: Is there a better way to read big integers?
         let big = BigInteger256::read(&buf[..]).unwrap();
         let big = BigUint::try_from(big).unwrap();
@@ -193,7 +196,7 @@ mod tests {
     use super::*;
     use num_traits::ToPrimitive;
     use std::str::FromStr;
-    use wasmi::{MemoryInstance};
+    use wasmi::{MemoryInstance, memory_units::Pages};
 
     fn new() -> SafeMemory {
         SafeMemory::new(

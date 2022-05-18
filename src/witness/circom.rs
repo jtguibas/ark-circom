@@ -1,6 +1,6 @@
 use color_eyre::Result;
 use wasmi::{
-    ExternVal, FuncRef, ImportsBuilder, Module, ModuleInstance, NopExternals, RuntimeValue, ModuleRef,
+    NopExternals, RuntimeValue, ModuleRef,
 };
 
 #[derive(Clone, Debug)]

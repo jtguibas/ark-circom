@@ -5,7 +5,7 @@ use num_traits::Zero;
 use std::fs::File;
 use wasmi::{
     memory_units::Pages, FuncRef, ImportsBuilder, MemoryInstance, MemoryRef, Module,
-    ModuleInstance, NopExternals, RuntimeValue, ModuleImportResolver, FuncInstance
+    ModuleInstance, NopExternals, ModuleImportResolver, FuncInstance
 };
 
 #[cfg(feature = "circom-2")]
@@ -324,7 +324,9 @@ impl WitnessCalculator {
     pub fn get_witness_buffer(&self) -> Result<Vec<u8>> {
         let ptr = self.instance.get_ptr_witness_buffer()? as usize;
         let len = self.instance.get_n_vars()? * self.n64 * 8;
-        Ok(self.memory.memory.get(ptr as u32, len as usize)?)
+        let mut buf = vec![0u8; len as usize];
+        self.memory.memory.get_into(ptr as u32, &mut buf)?;
+        Ok(buf)
     }
 }
 
