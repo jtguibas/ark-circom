@@ -1,4 +1,4 @@
-use color_eyre::Result;
+use color_eyre::{eyre::eyre, Result};
 use wasmi::{ModuleRef, NopExternals, RuntimeValue};
 
 #[derive(Clone, Debug)]
@@ -17,7 +17,8 @@ pub trait CircomBase {
         hash_lsb: u32,
     ) -> Result<()>;
     fn set_signal(&self, c_idx: u32, component: u32, signal: u32, p_val: u32) -> Result<()>;
-    fn get_u32(&self, name: &str) -> Result<u32>;
+    fn get_u32(&self, name: &str, args: &[RuntimeValue]) -> Result<u32>;
+    fn func(&self, name: &str, args: &[RuntimeValue]) -> Result<Option<RuntimeValue>>;
     // Only exists natively in Circom2, hardcoded for Circom
     fn get_version(&self) -> Result<u32>;
 }
@@ -39,91 +40,65 @@ pub trait Circom2 {
 
 impl Circom for Wasm {
     fn get_fr_len(&self) -> Result<u32> {
-        self.get_u32("getFrLen")
+        self.get_u32("getFrLen", &[])
     }
 
     fn get_ptr_raw_prime(&self) -> Result<u32> {
-        self.get_u32("getPRawPrime")
+        self.get_u32("getPRawPrime", &[])
     }
 }
 
 #[cfg(feature = "circom-2")]
 impl Circom2 for Wasm {
     fn get_field_num_len32(&self) -> Result<u32> {
-        self.get_u32("getFieldNumLen32")
+        self.get_u32("getFieldNumLen32", &[])
     }
 
     fn get_raw_prime(&self) -> Result<()> {
-        self.0
-            .invoke_export("getRawPrime", &[], &mut NopExternals)?;
+        self.func("getRawPrime", &[])?;
         Ok(())
     }
 
     fn read_shared_rw_memory(&self, i: u32) -> Result<u32> {
-        let result = self
-            .0
-            .invoke_export("readSharedRWMemory", &[i.into()], &mut NopExternals)?;
-        match result.unwrap() {
-            RuntimeValue::I32(val) => Ok(val as u32),
-            _ => Ok(0), //TODO
-        }
+        self.get_u32("readSharedRWMemory", &[i.into()])
     }
 
     fn write_shared_rw_memory(&self, i: u32, v: u32) -> Result<()> {
-        self.0.invoke_export(
-            "writeSharedRWMemory",
-            &[i.into(), v.into()],
-            &mut NopExternals,
-        )?;
+        self.func("writeSharedRWMemory", &[i.into(), v.into()])?;
         Ok(())
     }
 
     fn set_input_signal(&self, hmsb: u32, hlsb: u32, pos: u32) -> Result<()> {
-        self.0.invoke_export(
-            "setInputSignal",
-            &[hmsb.into(), hlsb.into(), pos.into()],
-            &mut NopExternals,
-        )?;
+        self.func("setInputSignal", &[hmsb.into(), hlsb.into(), pos.into()])?;
         Ok(())
     }
 
     fn get_witness(&self, i: u32) -> Result<()> {
-        self.0
-            .invoke_export("getWitness", &[i.into()], &mut NopExternals)?;
+        self.func("getWitness", &[i.into()])?;
         Ok(())
     }
 
     fn get_witness_size(&self) -> Result<u32> {
-        self.get_u32("getWitnessSize")
+        self.get_u32("getWitnessSize", &[])
     }
 }
 
 impl CircomBase for Wasm {
     fn init(&self, sanity_check: bool) -> Result<()> {
-        self.0.invoke_export(
-            "init",
-            &[RuntimeValue::I32(sanity_check as i32)],
-            &mut NopExternals,
-        )?;
+        self.func("init", &[RuntimeValue::I32(sanity_check as i32)])?;
         Ok(())
     }
 
     fn get_ptr_witness_buffer(&self) -> Result<u32> {
-        self.get_u32("getWitnessBuffer")
+        self.get_u32("getWitnessBuffer", &[])
     }
 
     fn get_ptr_witness(&self, w: u32) -> Result<u32> {
-        let result = self
-            .0
-            .invoke_export("getPWitness", &[w.into()], &mut NopExternals)?;
-        match result.unwrap() {
-            RuntimeValue::I32(val) => Ok(val as u32),
-            _ => Ok(0), //TODO
-        }
+        self.get_u32("getPWitness", &[w.into()])
     }
 
     fn get_n_vars(&self) -> Result<u32> {
-        self.get_u32("getNVars")
+        self.get_u32("getNVars", &[])
     }
 
     fn get_signal_offset32(
@@ -133,7 +108,7 @@ impl CircomBase for Wasm {
         hash_msb: u32,
         hash_lsb: u32,
     ) -> Result<()> {
-        self.0.invoke_export(
+        self.func(
             "getSignalOffset32",
             &[
                 p_sig_offset.into(),
@@ -141,32 +116,33 @@ impl CircomBase for Wasm {
                 hash_msb.into(),
                 hash_lsb.into(),
             ],
-            &mut NopExternals,
         )?;
 
         Ok(())
     }
 
     fn set_signal(&self, c_idx: u32, component: u32, signal: u32, p_val: u32) -> Result<()> {
-        self.0.invoke_export(
+        self.func(
             "setSignal",
             &[c_idx.into(), component.into(), signal.into(), p_val.into()],
-            &mut NopExternals,
         )?;
         Ok(())
     }
 
     // Default to version 1 if it isn't explicitly defined
     fn get_version(&self) -> Result<u32> {
-        self.get_u32("getVersion")
+        self.get_u32("getVersion", &[])
     }
 
-    fn get_u32(&self, name: &str) -> Result<u32> {
-        let result = self.0.invoke_export(name, &[], &mut NopExternals)?;
-        match result.unwrap() {
-            RuntimeValue::I32(val) => Ok(val as u32),
-            _ => Ok(0), //TODO
-        }
+    fn get_u32(&self, name: &str, args: &[RuntimeValue]) -> Result<u32> {
+        self.func(name, args)?
+            .ok_or_else(|| eyre!("returned null"))?
+            .try_into::<u32>()
+            .ok_or_else(|| eyre!("parsing as u32"))
+    }
+
+    fn func(&self, name: &str, args: &[RuntimeValue]) -> Result<Option<RuntimeValue>> {
+        Ok(self.0.invoke_export(name, args, &mut NopExternals)?)
     }
 }
 
