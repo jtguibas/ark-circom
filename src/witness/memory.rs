@@ -155,7 +155,8 @@ impl SafeMemory {
 
     fn write_long_normal(&mut self, ptr: usize, fr: &BigInt) -> Result<()> {
         self.memory.set_value::<u32>(ptr as u32, 0)?;
-        self.memory.set_value::<u32>((ptr + 4) as u32, i32::MIN as u32)?; // 0x80000000
+        self.memory
+            .set_value::<u32>((ptr + 4) as u32, i32::MIN as u32)?; // 0x80000000
         self.write_big(ptr + 8, fr)?;
         Ok(())
     }
@@ -196,7 +197,7 @@ mod tests {
     use super::*;
     use num_traits::ToPrimitive;
     use std::str::FromStr;
-    use wasmi::{MemoryInstance, memory_units::Pages};
+    use wasmi::{memory_units::Pages, MemoryInstance};
 
     fn new() -> SafeMemory {
         SafeMemory::new(
@@ -243,7 +244,12 @@ mod tests {
     #[test]
     fn read_write_fr_big_positive() {
         read_write_fr(BigInt::from(500000000000i64));
-        read_write_fr(BigInt::from_str("10944121435919637611123202872628637544274182200208017171849102093287904246808").unwrap());
+        read_write_fr(
+            BigInt::from_str(
+                "10944121435919637611123202872628637544274182200208017171849102093287904246808",
+            )
+            .unwrap(),
+        );
         read_write_fr(BigInt::from(50i64));
     }
 

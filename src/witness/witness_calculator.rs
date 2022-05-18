@@ -4,8 +4,8 @@ use num_bigint::BigInt;
 use num_traits::Zero;
 use std::fs::File;
 use wasmi::{
-    memory_units::Pages, FuncRef, ImportsBuilder, MemoryInstance, MemoryRef, Module,
-    ModuleInstance, NopExternals, ModuleImportResolver, FuncInstance
+    memory_units::Pages, FuncInstance, FuncRef, ImportsBuilder, MemoryInstance, MemoryRef, Module,
+    ModuleImportResolver, ModuleInstance, NopExternals,
 };
 
 #[cfg(feature = "circom-2")]
@@ -55,6 +55,26 @@ fn to_array32(s: &BigInt, size: usize) -> Vec<u32> {
     res
 }
 
+struct WasmImportResolver(MemoryRef);
+impl<'a> ModuleImportResolver for WasmImportResolver {
+    fn resolve_memory(
+        &self,
+        _field_name: &str,
+        _memory_type: &wasmi::MemoryDescriptor,
+    ) -> Result<MemoryRef, wasmi::Error> {
+        Ok(self.0.clone())
+    }
+
+    fn resolve_func(
+        &self,
+        _field_name: &str,
+        signature: &wasmi::Signature,
+    ) -> Result<FuncRef, wasmi::Error> {
+        // we ignore all external calls anyways with NopExternals
+        Ok(FuncInstance::alloc_host(signature.to_owned(), 0))
+    }
+}
+
 impl WitnessCalculator {
     pub fn new(path: impl AsRef<std::path::Path>) -> Result<Self> {
         Self::from_file(path)
@@ -69,43 +89,13 @@ impl WitnessCalculator {
     }
 
     pub fn from_module(module: Module) -> Result<Self> {
-
         let memory = MemoryInstance::alloc(Pages(2000), None)?;
 
-        struct MemResolver(MemoryRef);
-        impl<'a> ModuleImportResolver for MemResolver {
-            fn resolve_memory(
-                &self, 
-                field_name: &str,
-                _memory_type: &wasmi::MemoryDescriptor,
-            ) -> Result<MemoryRef, wasmi::Error> {
-                Ok(self.0.clone())
-            }
-        }
+        let import_resolver = WasmImportResolver(memory.clone());
 
-        struct FuncResolver;
-        impl<'a> ModuleImportResolver for FuncResolver {
-            fn resolve_func(
-                &self, 
-                field_name: &str, 
-                _signature: &wasmi::Signature
-            ) -> Result<FuncRef, wasmi::Error> {
-                if _signature.params().len() == 0 {
-                    Ok(FuncInstance::alloc_host(wasmi::Signature::new(&[][..], None), 0))
-                } else if _signature.params().len() == 1 {
-                    Ok(FuncInstance::alloc_host(wasmi::Signature::new(&[wasmi::ValueType::I32; 1][..], None), 0))
-                } else if _signature.params().len() == 2 {
-                    Ok(FuncInstance::alloc_host(wasmi::Signature::new(&[wasmi::ValueType::I32; 2][..], None), 0))
-                } else {
-                    Ok(FuncInstance::alloc_host(wasmi::Signature::new(&[wasmi::ValueType::I32; 6][..], None), 0))
-                }
-            }
-        }
-
-        let mem_import_resolver = MemResolver(memory.clone());
-
-        let imports = ImportsBuilder::new().with_resolver("env", &mem_import_resolver)
-        .with_resolver("runtime", &FuncResolver);
+        let imports = ImportsBuilder::new()
+            .with_resolver("env", &import_resolver)
+            .with_resolver("runtime", &import_resolver);
 
         let main = ModuleInstance::new(&module, &imports)
             .expect("Failed to instantiate module")

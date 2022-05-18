@@ -1,7 +1,5 @@
 use color_eyre::Result;
-use wasmi::{
-    NopExternals, RuntimeValue, ModuleRef,
-};
+use wasmi::{ModuleRef, NopExternals, RuntimeValue};
 
 #[derive(Clone, Debug)]
 pub struct Wasm(ModuleRef);
@@ -56,12 +54,15 @@ impl Circom2 for Wasm {
     }
 
     fn get_raw_prime(&self) -> Result<()> {
-        self.0.invoke_export("getRawPrime", &[], &mut NopExternals)?;
+        self.0
+            .invoke_export("getRawPrime", &[], &mut NopExternals)?;
         Ok(())
     }
 
     fn read_shared_rw_memory(&self, i: u32) -> Result<u32> {
-        let result = self.0.invoke_export("readSharedRWMemory", &[i.into()], &mut NopExternals)?;
+        let result = self
+            .0
+            .invoke_export("readSharedRWMemory", &[i.into()], &mut NopExternals)?;
         match result.unwrap() {
             RuntimeValue::I32(val) => Ok(val as u32),
             _ => Ok(0), //TODO
@@ -87,11 +88,8 @@ impl Circom2 for Wasm {
     }
 
     fn get_witness(&self, i: u32) -> Result<()> {
-        self.0.invoke_export(
-            "getWitness",
-            &[i.into()],
-            &mut NopExternals,
-        )?;
+        self.0
+            .invoke_export("getWitness", &[i.into()], &mut NopExternals)?;
         Ok(())
     }
 
@@ -115,7 +113,9 @@ impl CircomBase for Wasm {
     }
 
     fn get_ptr_witness(&self, w: u32) -> Result<u32> {
-        let result = self.0.invoke_export("getPWitness", &[w.into()], &mut NopExternals)?;
+        let result = self
+            .0
+            .invoke_export("getPWitness", &[w.into()], &mut NopExternals)?;
         match result.unwrap() {
             RuntimeValue::I32(val) => Ok(val as u32),
             _ => Ok(0), //TODO
