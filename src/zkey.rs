@@ -25,20 +25,29 @@
 //!  PointsC(8)
 //!  PointsH(9)
 //!  Contributions(10)
-use ark_ff::{BigInteger256, FromBytes, PrimeField};
-use ark_relations::r1cs::ConstraintMatrices;
+use ark_ec::bn::Bn;
+use ark_ff::{BigInteger, BigInteger256, Fp256, FpParameters, FromBytes, One, PrimeField};
+use ark_relations::r1cs::{
+    ConstraintMatrices, ConstraintSynthesizer, ConstraintSystem, OptimizationGoal,
+};
 use ark_serialize::{CanonicalDeserialize, SerializationError};
-use ark_std::log2;
+use ark_std::{log2, rand::Rng};
 use byteorder::{LittleEndian, ReadBytesExt};
 
 use std::{
     collections::HashMap,
-    io::{Read, Result as IoResult, Seek, SeekFrom},
+    io::{Read, Result as IoResult, Seek, SeekFrom, Write},
 };
 
-use ark_bn254::{Bn254, Fq, Fq2, Fr, G1Affine, G2Affine};
-use ark_groth16::{ProvingKey, VerifyingKey};
+use ark_bn254::{Bn254, Fq, Fq2, FqParameters, Fr, FrParameters, G1Affine, G2Affine, Parameters};
+use ark_groth16::{
+    generate_random_parameters_with_reduction, ProvingKey, VerifyingKey,
+};
 use num_traits::Zero;
+
+use color_eyre::Result;
+
+use crate::{CircomCircuit, CircomReduction};
 
 #[derive(Clone, Debug)]
 struct Section {
@@ -55,6 +64,34 @@ pub fn read_zkey<R: Read + Seek>(
     let proving_key = binfile.proving_key()?;
     let matrices = binfile.matrices()?;
     Ok((proving_key, matrices))
+}
+
+/// Generates a new SnarkJS ZKey file for a given circuit.
+pub fn generate_random_zkey<W: Write, R: Rng>(
+    circuit: CircomCircuit<Bn<Parameters>>,
+    rng: &mut R,
+    writer: &mut W,
+) -> Result<(
+    ProvingKey<Bn<Parameters>>,
+    ConstraintMatrices<Fp256<FrParameters>>,
+)> {
+    let params = generate_random_parameters_with_reduction::<Bn254, _, _, CircomReduction>(
+        circuit.clone(),
+        rng,
+    )?;
+    let cs = ConstraintSystem::new_ref();
+    cs.set_optimization_goal(OptimizationGoal::Constraints);
+    circuit.generate_constraints(cs.clone())?;
+
+    let mut matrices = cs.to_matrices().unwrap();
+
+    // adapt to snarkjs format
+    matrices.num_witness_variables += 1;
+    matrices.c_num_non_zero = 0;
+    matrices.c = vec![];
+
+    write_bin_file(&params, &matrices, writer)?;
+    Ok((params, matrices))
 }
 
 #[derive(Debug)]
@@ -357,6 +394,156 @@ fn deserialize_g2_vec<R: Read>(reader: &mut R, n_vars: u32) -> IoResult<Vec<G2Af
     (0..n_vars).map(|_| deserialize_g2(reader)).collect()
 }
 
+// zkey writer
+fn write_bin_file<W: Write>(
+    params: &ProvingKey<Bn<Parameters>>,
+    matrices: &ConstraintMatrices<Fp256<FrParameters>>,
+    writer: &mut W,
+) -> IoResult<()> {
+    let n_pub_inputs = (matrices.num_instance_variables - 1) as u64;
+    let n_vars = (matrices.num_witness_variables as u64) + n_pub_inputs;
+    let domain_size = n_vars.next_power_of_two();
+
+    // header
+    // magic number (zkey)
+    let magic = [122u8, 107u8, 101u8, 121u8];
+    writer.write_all(&magic)?;
+
+    // version 1
+    write_u32(1, writer)?;
+
+    // 10 sections
+    write_u32(10, writer)?;
+
+    // section 1
+    write_u32(1, writer)?;
+    writer.write_all(&4u64.to_le_bytes())?;
+    write_u32(1, writer)?;
+
+    // section 2
+    write_section_header(2, 660, writer)?;
+    write_u32(32, writer)?;
+    writer.write_all(&FqParameters::MODULUS.to_bytes_le())?;
+    write_u32(32, writer)?;
+    writer.write_all(&FrParameters::MODULUS.to_bytes_le())?;
+
+    write_u32(n_vars as u32, writer)?;
+    write_u32(n_pub_inputs as u32, writer)?;
+    write_u32(domain_size as u32, writer)?;
+
+    write_g1(params.vk.alpha_g1, writer)?;
+    write_g1(params.beta_g1, writer)?;
+    write_g2(params.vk.beta_g2, writer)?;
+    write_g2(params.vk.gamma_g2, writer)?;
+    write_g1(params.delta_g1, writer)?;
+    write_g2(params.vk.delta_g2, writer)?;
+
+    // section 4
+    let matrix_len = 2 * (n_pub_inputs as u32 + matrices.a_num_non_zero as u32);
+    let section_size = (4 + matrix_len * (12 + 32)) as u64;
+    write_section_header(4, section_size, writer)?;
+    write_u32(matrix_len, writer)?;
+
+    let tmp = [&matrices.a, &matrices.b];
+
+    for (m_idx, &matrix) in tmp.iter().enumerate() {
+        for (c_idx, entry) in matrix.iter().enumerate() {
+            for &(value, signal) in entry {
+                write_u32(m_idx as u32, writer)?;
+                write_u32(c_idx as u32, writer)?;
+                write_u32(signal as u32, writer)?;
+                write_field_fr(value, writer)?;
+            }
+        }
+    }
+
+    for i in 0..n_pub_inputs + 1 {
+        write_u32(0, writer)?;
+        write_u32(i as u32 + matrices.num_constraints as u32, writer)?;
+        write_u32(i as u32, writer)?;
+        write_field_fr(Fr::one(), writer)?;
+    }
+
+    // section 3
+    write_section_header(3, params.vk.gamma_abc_g1.len() as u64 * 64, writer)?;
+    for &el in &params.vk.gamma_abc_g1 {
+        write_g1(el, writer)?;
+    }
+
+    // section 9
+    write_section_header(9, params.h_query.len() as u64 * 64, writer)?;
+    for &el in &params.h_query {
+        write_g1(el, writer)?;
+    }
+
+    // section 8
+    write_section_header(8, params.l_query.len() as u64 * 64, writer)?;
+    for &el in &params.l_query {
+        write_g1(el, writer)?;
+    }
+
+    // section 5
+    write_section_header(5, params.a_query.len() as u64 * 64, writer)?;
+    for &el in &params.a_query {
+        write_g1(el, writer)?;
+    }
+
+    // section 6
+    write_section_header(6, params.b_g1_query.len() as u64 * 64, writer)?;
+    for &el in &params.b_g1_query {
+        write_g1(el, writer)?;
+    }
+
+    // section 7
+    write_section_header(7, params.b_g2_query.len() as u64 * 128, writer)?;
+    for &el in &params.b_g2_query {
+        write_g2(el, writer)?;
+    }
+
+    // section 10
+    write_section_header(10, 68, writer)?;
+    // TODO: calculate circuit hash
+    writer.write_all(&[0u8; 68])?;
+
+    Ok(())
+}
+
+fn write_section_header<W: Write>(
+    section_id: u32,
+    section_size: u64,
+    writer: &mut W,
+) -> IoResult<()> {
+    writer.write_all(&section_id.to_le_bytes())?;
+    writer.write_all(&section_size.to_le_bytes())?;
+    Ok(())
+}
+
+fn write_u32<W: Write>(value: u32, writer: &mut W) -> IoResult<()> {
+    writer.write_all(&value.to_le_bytes())
+}
+
+fn write_field<W: Write>(field: Fp256<FqParameters>, writer: &mut W) -> IoResult<()> {
+    writer.write_all(&field.0.to_bytes_le())
+}
+
+fn write_field_fr<W: Write>(field: Fp256<FrParameters>, writer: &mut W) -> IoResult<()> {
+    writer.write_all(&Fr::from_repr(field.0).unwrap().0.to_bytes_le())
+}
+
+fn write_g1<W: Write>(point: G1Affine, writer: &mut W) -> IoResult<()> {
+    write_field(point.x, writer)?;
+    write_field(point.y, writer)?;
+    Ok(())
+}
+
+fn write_g2<W: Write>(point: G2Affine, writer: &mut W) -> IoResult<()> {
+    write_field(point.x.c0, writer)?;
+    write_field(point.x.c1, writer)?;
+    write_field(point.y.c0, writer)?;
+    write_field(point.y.c1, writer)?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -371,7 +558,7 @@ mod tests {
         create_proof_with_reduction_and_matrices, create_random_proof_with_reduction as prove,
         prepare_verifying_key, verify_proof,
     };
-    use ark_std::rand::thread_rng;
+    use ark_std::rand::{thread_rng, SeedableRng};
     use num_traits::{One, Zero};
     use std::str::FromStr;
 
@@ -904,5 +1091,38 @@ mod tests {
         let verified = verify_proof(&pvk, &proof, inputs).unwrap();
 
         assert!(verified);
+    }
+
+    #[test]
+    fn serialize_deserialize_zkey() {
+        let cfg = CircomConfig::<Bn254>::new(
+            "./test-vectors/mycircuit.wasm", //Todo: wasm generator not needed, we should add a second constructor
+            "./test-vectors/mycircuit.r1cs",
+        )
+        .unwrap();
+        let builder = CircomBuilder::new(cfg);
+        let circuit = builder.setup();
+
+        let path = "./test-vectors/mycircuit.zkey";
+
+        use rand_chacha::ChaCha8Rng;
+        let mut rng = ChaCha8Rng::seed_from_u64(1337);
+
+        let mut writer = File::create(path).unwrap();
+
+        let (params, matrices) =
+            generate_random_zkey(circuit.clone(), &mut rng, &mut writer).unwrap();
+
+        let mut reader = File::open(path).unwrap();
+        let (params2, matrices2) = read_zkey(&mut reader).unwrap();
+
+        // strip out infinity flag, since it is interpreted differently
+        fn strip_infinity(s: String) -> String {
+            s.replace("infinity: false", "")
+                .replace("infinity: true", "")
+        }
+
+        assert_eq!(strip_infinity(format!("{:?}", params)), strip_infinity(format!("{:?}", params2)));
+        assert_eq!(strip_infinity(format!("{:?}", matrices)), strip_infinity(format!("{:?}", matrices2)));
     }
 }
