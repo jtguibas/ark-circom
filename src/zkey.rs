@@ -40,9 +40,7 @@ use std::{
 };
 
 use ark_bn254::{Bn254, Fq, Fq2, FqParameters, Fr, FrParameters, G1Affine, G2Affine, Parameters};
-use ark_groth16::{
-    generate_random_parameters_with_reduction, ProvingKey, VerifyingKey,
-};
+use ark_groth16::{generate_random_parameters_with_reduction, ProvingKey, VerifyingKey};
 use num_traits::Zero;
 
 use color_eyre::Result;
@@ -551,6 +549,7 @@ mod tests {
     use num_bigint::BigUint;
     use serde_json::Value;
     use std::fs::File;
+    use std::time::Instant;
 
     use crate::witness::WitnessCalculator;
     use crate::{circom::CircomReduction, CircomBuilder, CircomConfig};
@@ -1122,7 +1121,40 @@ mod tests {
                 .replace("infinity: true", "")
         }
 
-        assert_eq!(strip_infinity(format!("{:?}", params)), strip_infinity(format!("{:?}", params2)));
-        assert_eq!(strip_infinity(format!("{:?}", matrices)), strip_infinity(format!("{:?}", matrices2)));
+        assert_eq!(
+            strip_infinity(format!("{:?}", params)),
+            strip_infinity(format!("{:?}", params2))
+        );
+        assert_eq!(
+            strip_infinity(format!("{:?}", matrices)),
+            strip_infinity(format!("{:?}", matrices2))
+        );
+    }
+
+    #[test]
+    fn test_large_zkey() {
+        let cfg = CircomConfig::<Bn254>::new(
+            "./test-vectors/pubkeygen.wasm", //Todo: wasm generator not needed, we should add a second constructor
+            "./test-vectors/pubkeygen.r1cs",
+        )
+        .unwrap();
+
+        let start = Instant::now();
+
+        let builder = CircomBuilder::new(cfg);
+
+        let circuit = builder.setup();
+
+        let path = "./test-vectors/pubkeygen.zkey";
+
+        use rand_chacha::ChaCha8Rng;
+        let mut rng = ChaCha8Rng::seed_from_u64(1337);
+
+        let mut writer = File::create(path).unwrap();
+
+        let (params, matrices) =
+            generate_random_zkey(circuit.clone(), &mut rng, &mut writer).unwrap();
+        let duration = start.elapsed();
+        println!("zkey generation took: {:?}", duration);
     }
 }
