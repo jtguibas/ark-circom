@@ -1133,11 +1133,7 @@ mod tests {
 
     #[test]
     fn test_large_zkey() {
-        let cfg = CircomConfig::<Bn254>::new(
-            "./test-vectors/pubkeygen.wasm", //Todo: wasm generator not needed, we should add a second constructor
-            "./test-vectors/pubkeygen.r1cs",
-        )
-        .unwrap();
+        let cfg = CircomConfig::<Bn254>::new_without_witness("./test-vectors/pubkeygen.r1cs").unwrap();
 
         let start = Instant::now();
 

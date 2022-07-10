@@ -7,7 +7,7 @@ use num_bigint::BigInt;
 use std::collections::HashMap;
 
 use crate::{circom::R1CSFile, witness::WitnessCalculator};
-use color_eyre::Result;
+use color_eyre::{Result, eyre::eyre};
 
 #[derive(Clone, Debug)]
 pub struct CircomBuilder<E: PairingEngine> {
@@ -19,18 +19,28 @@ pub struct CircomBuilder<E: PairingEngine> {
 #[derive(Clone, Debug)]
 pub struct CircomConfig<E: PairingEngine> {
     pub r1cs: R1CS<E>,
-    pub wtns: WitnessCalculator,
+    pub wtns: Option<WitnessCalculator>,
     pub sanity_check: bool,
 }
 
 impl<E: PairingEngine> CircomConfig<E> {
     pub fn new(wtns: impl AsRef<Path>, r1cs: impl AsRef<Path>) -> Result<Self> {
-        let wtns = WitnessCalculator::new(wtns).unwrap();
+        let wtns = Some(WitnessCalculator::new(wtns).unwrap());
         let reader = File::open(r1cs)?;
         let r1cs = R1CSFile::new(reader)?.into();
         Ok(Self {
             wtns,
             r1cs,
+            sanity_check: false,
+        })
+    }
+
+    pub fn new_without_witness(r1cs: impl AsRef<Path>) -> Result<Self> {
+        let reader = File::open(r1cs)?;
+        let r1cs = R1CSFile::new(reader)?.into();
+        Ok(Self {
+            r1cs,
+            wtns: None,
             sanity_check: false,
         })
     }
@@ -74,7 +84,7 @@ impl<E: PairingEngine> CircomBuilder<E> {
         // calculate the witness
         let witness = self
             .cfg
-            .wtns
+            .wtns.ok_or_else(|| eyre!("no witness calculator provided"))?
             .calculate_witness_element::<E, _>(self.inputs, self.cfg.sanity_check)?;
         circom.witness = Some(witness);
 
