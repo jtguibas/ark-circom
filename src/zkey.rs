@@ -463,7 +463,11 @@ fn write_bin_file<W: Write>(
         write_u32(i as u32 + matrices.num_constraints as u32, writer)?;
         write_u32(i as u32, writer)?;
         write_field_fr(Fr::one(), writer)?;
+        totalWritten += 12 + 32;
     }
+
+    println!("sectionSize {}", section_size);
+    println!("totalWritten {}", totalWritten);
 
     // section 3
     write_section_header(3, params.vk.gamma_abc_g1.len() as u64 * 64, writer)?;
