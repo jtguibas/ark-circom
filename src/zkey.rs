@@ -441,7 +441,7 @@ fn write_bin_file<W: Write>(
     let section_size = (4 + matrix_len * (12 + 32)) as u64;
     println!("matrices.a_num_non_zero {}", matrices.a_num_non_zero);
     println!("matrices.b_num_non_zero {}", matrices.b_num_non_zero);
-    println!("n_pub_inputs {}", num_pub_inputs);
+    println!("n_pub_inputs {}", n_pub_inputs);
     println!("matrix_len {}", matrix_len);
     println!("section_size {}", section_size);
     write_section_header(4, section_size, writer)?;
