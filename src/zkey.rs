@@ -437,15 +437,19 @@ fn write_bin_file<W: Write>(
     write_g2(params.vk.delta_g2, writer)?;
 
     // section 4
-    let matrix_len = (n_pub_inputs as u32) + (2 * matrices.a_num_non_zero as u32);
-    let section_size = (4 + matrix_len * (12 + 32)) as u64;
-    println!("matrices.a_num_non_zero {}", matrices.a_num_non_zero);
-    println!("matrices.b_num_non_zero {}", matrices.b_num_non_zero);
-    println!("n_pub_inputs {}", n_pub_inputs);
-    println!("matrix_len {}", matrix_len);
-    println!("section_size {}", section_size);
+    let matrix_len =
+        (matrices.a_num_non_zero as u64) + (matrices.b_num_non_zero as u64) + (n_pub_inputs as u64);
+    let n_coeffs = matrix_len + 1;
+    let section_size = (4 + n_coeffs * (12 + 32)) as u64;
+    // let matrix_len = (n_pub_inputs as u32) + (2 * matrices.a_num_non_zero as u32);
+    // let section_size = (4 + matrix_len * (12 + 32)) as u64;
+    // println!("matrices.a_num_non_zero {}", matrices.a_num_non_zero);
+    // println!("matrices.b_num_non_zero {}", matrices.b_num_non_zero);
+    // println!("n_pub_inputs {}", n_pub_inputs);
+    // println!("matrix_len {}", matrix_len);
+    // println!("section_size {}", section_size);
     write_section_header(4, section_size, writer)?;
-    write_u32(matrix_len, writer)?;
+    write_u32(matrix_len as u32, writer)?;
 
     let tmp = [&matrices.a, &matrices.b];
 
@@ -471,6 +475,7 @@ fn write_bin_file<W: Write>(
         totalWritten += 12 + 32;
     }
 
+    println!("sectionSize {}", section_size);
     println!("totalWritten {}", totalWritten);
 
     // section 3
