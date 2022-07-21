@@ -439,6 +439,11 @@ fn write_bin_file<W: Write>(
     // section 4
     let matrix_len = (n_pub_inputs as u32) + (2 * matrices.a_num_non_zero as u32);
     let section_size = (4 + matrix_len * (12 + 32)) as u64;
+    println!("matrices.a_num_non_zero {}", matrices.a_num_non_zero);
+    println!("matrices.b_num_non_zero {}", matrices.b_num_non_zero);
+    println!("n_pub_inputs {}", num_pub_inputs);
+    println!("matrix_len {}", matrix_len);
+    println!("section_size {}", section_size);
     write_section_header(4, section_size, writer)?;
     write_u32(matrix_len, writer)?;
 
@@ -466,7 +471,6 @@ fn write_bin_file<W: Write>(
         totalWritten += 12 + 32;
     }
 
-    println!("sectionSize {}", section_size);
     println!("totalWritten {}", totalWritten);
 
     // section 3
@@ -1140,7 +1144,8 @@ mod tests {
 
     #[test]
     fn test_large_zkey() {
-        let cfg = CircomConfig::<Bn254>::new_without_witness("./test-vectors/pubkeygen.r1cs").unwrap();
+        let cfg =
+            CircomConfig::<Bn254>::new_without_witness("./test-vectors/pubkeygen.r1cs").unwrap();
 
         let start = Instant::now();
 
