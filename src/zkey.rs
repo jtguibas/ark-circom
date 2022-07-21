@@ -437,12 +437,14 @@ fn write_bin_file<W: Write>(
     write_g2(params.vk.delta_g2, writer)?;
 
     // section 4
-    let matrix_len = 2 * (n_pub_inputs as u32 + matrices.a_num_non_zero as u32);
+    let matrix_len = (n_pub_inputs as u32) + (2 * matrices.a_num_non_zero as u32);
     let section_size = (4 + matrix_len * (12 + 32)) as u64;
     write_section_header(4, section_size, writer)?;
     write_u32(matrix_len, writer)?;
 
     let tmp = [&matrices.a, &matrices.b];
+
+    let mut totalWritten = 4u64;
 
     for (m_idx, &matrix) in tmp.iter().enumerate() {
         for (c_idx, entry) in matrix.iter().enumerate() {
@@ -451,6 +453,7 @@ fn write_bin_file<W: Write>(
                 write_u32(c_idx as u32, writer)?;
                 write_u32(signal as u32, writer)?;
                 write_field_fr(value, writer)?;
+                totalWritten += 12 + 32;
             }
         }
     }
